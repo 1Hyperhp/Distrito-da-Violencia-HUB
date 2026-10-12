@@ -15,10 +15,10 @@ local KILLER_TEAMS = {killer=true, murderer=true, assassin=true, assassino=true}
 local SURVIVOR_TEAMS = {survivor=true, survivors=true, sobrevivente=true, sobreviventes=true}
 local GENERATOR_NAMES = {generator=true, generators=true, gerador=true, geradores=true}
 
-local previous = CoreGui:FindFirstChild('VDHubV35') or CoreGui:FindFirstChild('VDHubV34') or CoreGui:FindFirstChild('VDHubV33') or CoreGui:FindFirstChild('VDHubV27') or CoreGui:FindFirstChild('VDHubV26') or CoreGui:FindFirstChild('VDHubV25') or CoreGui:FindFirstChild('VDHubV24') or CoreGui:FindFirstChild('VDHubV23') or CoreGui:FindFirstChild('VDHubV22') or CoreGui:FindFirstChild('VDHubV21') or CoreGui:FindFirstChild('VDHubV20') or CoreGui:FindFirstChild('VDHubV19') or CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
+local previous = CoreGui:FindFirstChild('VDHubV36') or CoreGui:FindFirstChild('VDHubV35') or CoreGui:FindFirstChild('VDHubV34') or CoreGui:FindFirstChild('VDHubV33') or CoreGui:FindFirstChild('VDHubV27') or CoreGui:FindFirstChild('VDHubV26') or CoreGui:FindFirstChild('VDHubV25') or CoreGui:FindFirstChild('VDHubV24') or CoreGui:FindFirstChild('VDHubV23') or CoreGui:FindFirstChild('VDHubV22') or CoreGui:FindFirstChild('VDHubV21') or CoreGui:FindFirstChild('VDHubV20') or CoreGui:FindFirstChild('VDHubV19') or CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
 if previous then previous:Destroy() end
 local gui = Instance.new('ScreenGui')
-gui.Name = 'VDHubV35'
+gui.Name = 'VDHubV36'
 gui.ResetOnSpawn = false
 gui.Parent = CoreGui
 
@@ -52,7 +52,7 @@ local function label(parent, text, size, pos, font, color)
     l.Parent = parent
     return l
 end
-label(frame,'VIOLENCE DISTRICT HUB V35',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
+label(frame,'VIOLENCE DISTRICT HUB V36',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
 -- Controles da janela: minimizar, fechar e esconder com CTRL.
 local function windowButton(symbol, x, bg)
     local b = Instance.new('TextButton')
@@ -239,7 +239,9 @@ listen(speedButton.MouseButton1Click,function()
     end
     updateSpeedUI()
 end)
-local draggingSpeed = false
+-- V36: slider aceita mouse e arraste por toque, sem botoes extras.
+local draggingMouse = false
+local draggingTouch = nil
 local function setSpeedFromX(x)
     local width = track.AbsoluteSize.X
     if width <= 0 then return end
@@ -248,20 +250,29 @@ local function setSpeedFromX(x)
     updateSpeedUI()
     if speedEnabled then writeSpeed(lastBase) end
 end
-listen(knob.MouseButton1Down,function() draggingSpeed=true end)
-listen(track.InputBegan,function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        draggingSpeed=true
+local function startSlider(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        if not draggingTouch then
+            draggingTouch = input
+            setSpeedFromX(input.Position.X)
+        end
+    elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+        draggingMouse = true
         setSpeedFromX(input.Position.X)
     end
-end)
+end
+listen(knob.InputBegan,startSlider)
+listen(track.InputBegan,startSlider)
 listen(UIS.InputChanged,function(input)
-    if draggingSpeed and input.UserInputType == Enum.UserInputType.MouseMovement then
+    if draggingTouch == input then
+        setSpeedFromX(input.Position.X)
+    elseif draggingMouse and input.UserInputType == Enum.UserInputType.MouseMovement then
         setSpeedFromX(input.Position.X)
     end
 end)
 listen(UIS.InputEnded,function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingSpeed=false end
+    if draggingTouch == input then draggingTouch = nil end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingMouse = false end
 end)
 listen(LocalPlayer.CharacterAdded,function(char)
     task.defer(function()
@@ -629,4 +640,4 @@ task.spawn(function()
         task.wait(1)
     end
 end)
-print('Violence District HUB V35: multiplicador dinamico, CTRL oculta/mostra; - minimiza; X fecha.')
+print('Violence District HUB V36: multiplicador dinamico, CTRL oculta/mostra; - minimiza; X fecha.')

@@ -14,10 +14,10 @@ local KILLER_TEAMS = {killer=true, murderer=true, assassin=true, assassino=true}
 local SURVIVOR_TEAMS = {survivor=true, survivors=true, sobrevivente=true, sobreviventes=true}
 local GENERATOR_NAMES = {generator=true, generators=true, gerador=true, geradores=true}
 
-local previous = CoreGui:FindFirstChild('VDHubV21') or CoreGui:FindFirstChild('VDHubV20') or CoreGui:FindFirstChild('VDHubV19') or CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
+local previous = CoreGui:FindFirstChild('VDHubV22') or CoreGui:FindFirstChild('VDHubV21') or CoreGui:FindFirstChild('VDHubV20') or CoreGui:FindFirstChild('VDHubV19') or CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
 if previous then previous:Destroy() end
 local gui = Instance.new('ScreenGui')
-gui.Name = 'VDHubV22'
+gui.Name = 'VDHubV23'
 gui.ResetOnSpawn = false
 gui.Parent = CoreGui
 
@@ -51,7 +51,7 @@ local function label(parent, text, size, pos, font, color)
     l.Parent = parent
     return l
 end
-label(frame,'VIOLENCE DISTRICT HUB V22',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
+label(frame,'VIOLENCE DISTRICT HUB V23',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
 -- Controles da janela: minimizar, fechar e esconder com CTRL.
 local function windowButton(symbol, x, bg)
     local b = Instance.new('TextButton')
@@ -201,7 +201,7 @@ listen(speedButton.MouseButton1Click,function()
     speedEnabled = not speedEnabled
     if speedEnabled then
         applySpeed()
-        speedNote.Text = 'Ativo durante a partida.'
+        speedNote.Text = 'Mantem o ajuste ao usar e soltar Shift.'
     else
         restoreSpeed()
         speedNote.Text = 'Desligado. Velocidade restaurada.'
@@ -244,6 +244,20 @@ listen(LocalPlayer.CharacterAdded,function()
     end
 end)
 updateSpeedUI()
+
+-- O sprint do jogo pode reescrever WalkSpeed ao pressionar/soltar Shift.
+-- Checagem moderada, somente quando a opcao esta ligada.
+task.spawn(function()
+    while gui.Parent do
+        if speedEnabled then
+            local hum = getHumanoid()
+            if hum and hum.Health > 0 and math.abs(hum.WalkSpeed - speedValue) > 0.05 then
+                pcall(applySpeed)
+            end
+        end
+        task.wait(0.12)
+    end
+end)
 
 local enabled = {killer=false,survivor=false,generator=false}
 local colors = {killer=Color3.fromRGB(255,65,65),survivor=Color3.fromRGB(55,235,100),generator=Color3.fromRGB(255,255,255)}
@@ -538,4 +552,4 @@ task.spawn(function()
         task.wait(1)
     end
 end)
-print('Violence District HUB V22: velocidade ajustavel, CTRL oculta/mostra; - minimiza; X fecha.')
+print('Violence District HUB V23: velocidade ajustavel, CTRL oculta/mostra; - minimiza; X fecha.')

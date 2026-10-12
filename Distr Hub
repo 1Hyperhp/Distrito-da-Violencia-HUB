@@ -1,0 +1,386 @@
+-- Violence District HUB V8 - ESP otimizado e detector experimental do skill check
+-- A deteccao de skill check requer identificacao da interface real do jogo.
+local Players = game:GetService('Players')
+local UIS = game:GetService('UserInputService')
+local LocalPlayer = Players.LocalPlayer
+local CoreGui = game:GetService('CoreGui')
+local RunService = game:GetService('RunService')
+if type(_G.VD_HUB_STOP) == 'function' then pcall(_G.VD_HUB_STOP) end
+for _, v in ipairs({'VD_V16_STOP','VD_V17_STOP','VD_V18_STOP'}) do
+    if type(_G[v]) == 'function' then pcall(_G[v]) end
+end
+
+local KILLER_TEAMS = {killer=true, murderer=true, assassin=true, assassino=true}
+local SURVIVOR_TEAMS = {survivor=true, survivors=true, sobrevivente=true, sobreviventes=true}
+local GENERATOR_NAMES = {generator=true, generators=true, gerador=true, geradores=true}
+
+local previous = CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
+if previous then previous:Destroy() end
+local gui = Instance.new('ScreenGui')
+gui.Name = 'VDHubV19'
+gui.ResetOnSpawn = false
+gui.Parent = CoreGui
+
+local connections = {}
+local function listen(signal, fn)
+    local conn = signal:Connect(fn)
+    table.insert(connections, conn)
+    return conn
+end
+
+local frame = Instance.new('Frame')
+frame.Size = UDim2.fromOffset(430,255)
+frame.Position = UDim2.new(0,25,0.35,0)
+frame.BackgroundColor3 = Color3.fromRGB(24,25,32)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+Instance.new('UICorner',frame).CornerRadius = UDim.new(0,10)
+
+local function label(parent, text, size, pos, font, color)
+    local l = Instance.new('TextLabel')
+    l.Size = size
+    l.Position = pos
+    l.BackgroundTransparency = 1
+    l.Text = text
+    l.TextColor3 = color or Color3.new(1,1,1)
+    l.TextSize = 13
+    l.Font = font or Enum.Font.Gotham
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.Parent = parent
+    return l
+end
+label(frame,'VIOLENCE DISTRICT HUB V19',UDim2.new(1,-24,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
+local sidebar = Instance.new('Frame')
+sidebar.Size = UDim2.fromOffset(110,202)
+sidebar.Position = UDim2.fromOffset(9,43)
+sidebar.BackgroundColor3 = Color3.fromRGB(31,33,42)
+sidebar.BorderSizePixel = 0
+sidebar.Parent = frame
+Instance.new('UICorner',sidebar).CornerRadius = UDim.new(0,8)
+local content = Instance.new('Frame')
+content.Size = UDim2.fromOffset(296,202)
+content.Position = UDim2.fromOffset(125,43)
+content.BackgroundColor3 = Color3.fromRGB(31,33,42)
+content.BorderSizePixel = 0
+content.Parent = frame
+Instance.new('UICorner',content).CornerRadius = UDim.new(0,8)
+local espPage = Instance.new('Frame')
+espPage.Size = UDim2.fromScale(1,1)
+espPage.BackgroundTransparency = 1
+espPage.Parent = content
+local autoPage = Instance.new('Frame')
+autoPage.Size = UDim2.fromScale(1,1)
+autoPage.BackgroundTransparency = 1
+autoPage.Visible = false
+autoPage.Parent = content
+local function sideButton(text, y, page)
+    local b = Instance.new('TextButton')
+    b.Size = UDim2.fromOffset(96,40)
+    b.Position = UDim2.fromOffset(7,y)
+    b.BackgroundColor3 = Color3.fromRGB(47,49,61)
+    b.TextColor3 = Color3.new(1,1,1)
+    b.Text = text
+    b.TextSize = 14
+    b.Font = Enum.Font.GothamBold
+    b.Parent = sidebar
+    Instance.new('UICorner',b).CornerRadius = UDim.new(0,7)
+    listen(b.MouseButton1Click,function()
+        espPage.Visible = page == 'ESP'
+        autoPage.Visible = page == 'Auto'
+    end)
+end
+sideButton('ESP',10,'ESP')
+sideButton('Auto',57,'Auto')
+
+local enabled = {killer=false,survivor=false,generator=false}
+local colors = {killer=Color3.fromRGB(255,65,65),survivor=Color3.fromRGB(55,235,100),generator=Color3.fromRGB(255,255,255)}
+local marks = {}
+local generators = {}
+
+local function clearMark(inst)
+    local h = marks[inst]
+    if h then h:Destroy(); marks[inst] = nil end
+end
+local function mark(inst,kind)
+    if not inst or not inst:IsDescendantOf(workspace) or not enabled[kind] then
+        clearMark(inst)
+        return
+    end
+    local h = marks[inst]
+    if not h then
+        h = Instance.new('Highlight')
+        h.Name = 'VD_ESP_Marker'
+        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        h.FillTransparency = .72
+        h.OutlineTransparency = 0
+        h.Adornee = inst
+        h.Parent = gui
+        marks[inst] = h
+    end
+    h.FillColor = colors[kind]
+    h.OutlineColor = colors[kind]
+end
+local function role(player)
+    local teamName = player.Team and player.Team.Name:lower() or ''
+    if KILLER_TEAMS[teamName] then return 'killer' end
+    if SURVIVOR_TEAMS[teamName] then return 'survivor' end
+    return nil
+end
+local function refreshPlayers()
+    local wanted = {}
+    for _,player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local r = role(player)
+            if r and enabled[r] then
+                wanted[player.Character] = r
+            end
+        end
+    end
+    for inst,h in pairs(marks) do
+        if not generators[inst] and not wanted[inst] then
+            clearMark(inst)
+        end
+    end
+    for inst,kind in pairs(wanted) do mark(inst,kind) end
+end
+-- Detecta candidatos por nome, atributos ou prompts de reparo.
+-- Um modelo proximo do prompt e usado como alvo, evitando marcar a peca isolada.
+local function genHint(name)
+    local n = name:lower()
+    return n:find('generator',1,true) or n:find('gerador',1,true)
+        or n:find('repair',1,true) or n:find('engine',1,true)
+end
+local function hasRepairPrompt(obj)
+    for _, d in ipairs(obj:GetDescendants()) do
+        if d:IsA('ProximityPrompt') then
+            local phrase = (d.Name..' '..d.ActionText..' '..d.ObjectText):lower()
+            if phrase:find('repair',1,true) or phrase:find('repar',1,true)
+                or phrase:find('generator',1,true) or phrase:find('gerador',1,true) then
+                return true
+            end
+        end
+    end
+    return false
+end
+local function isGenerator(obj)
+    if not (obj:IsA('Model') or obj:IsA('BasePart')) then return false end
+    if not obj:IsDescendantOf(workspace) then return false end
+    local hint = genHint(obj.Name) or hasRepairPrompt(obj)
+    if not hint then return false end
+    -- Prefere o modelo inteiro, quando o nome do pai identifica o mesmo gerador.
+    local parent = obj.Parent
+    if parent and (parent:IsA('Model') or parent:IsA('BasePart')) and genHint(parent.Name) then
+        return false
+    end
+    return true
+end
+local function registerGenerator(obj)
+    if isGenerator(obj) then
+        generators[obj] = true
+        if enabled.generator then mark(obj,'generator') end
+    end
+end
+local function rescanGeneratorMap()
+    -- Varredura sob demanda e em intervalos longos, nunca por frame.
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA('Model') or obj:IsA('BasePart') then
+            registerGenerator(obj)
+        end
+    end
+end
+local function refreshGenerators()
+    for inst in pairs(generators) do
+        if not inst:IsDescendantOf(workspace) or not isGenerator(inst) then
+            generators[inst] = nil
+            clearMark(inst)
+        elseif enabled.generator then
+            mark(inst,'generator')
+        else
+            clearMark(inst)
+        end
+    end
+end
+rescanGeneratorMap()
+listen(workspace.DescendantAdded,function(obj)
+    if obj:IsA('Model') or obj:IsA('BasePart') then registerGenerator(obj) end
+    if obj:IsA('ProximityPrompt') or obj:IsA('Model') or obj:IsA('Folder') then
+        task.defer(function()
+            if not gui.Parent then return end
+            local ancestor = obj
+            for _ = 1, 5 do
+                if not ancestor or ancestor == workspace then break end
+                if ancestor:IsA('Model') then registerGenerator(ancestor) end
+                ancestor = ancestor.Parent
+            end
+            if obj:IsA('Model') or obj:IsA('Folder') then
+                for _,child in ipairs(obj:GetDescendants()) do
+                    if child:IsA('Model') or child:IsA('BasePart') then registerGenerator(child) end
+                end
+            end
+        end)
+    end
+end)
+listen(workspace.DescendantRemoving,function(obj)
+    if generators[obj] then generators[obj] = nil; clearMark(obj) end
+end)
+local function makeButton(key,title,y)
+    local b = Instance.new('TextButton')
+    b.Size = UDim2.new(1,-20,0,38)
+    b.Position = UDim2.fromOffset(10,y)
+    b.BackgroundColor3 = Color3.fromRGB(43,44,54)
+    b.TextColor3 = colors[key]
+    b.Font = Enum.Font.GothamSemibold
+    b.TextSize = 13
+    b.Parent = espPage
+    Instance.new('UICorner',b).CornerRadius = UDim.new(0,7)
+    local function update() b.Text = title .. (enabled[key] and '  [ON]' or '  [OFF]') end
+    listen(b.MouseButton1Click,function()
+        enabled[key] = not enabled[key]
+        update()
+        if key == 'generator' then
+            if enabled.generator then rescanGeneratorMap() end
+            refreshGenerators()
+        else refreshPlayers() end
+    end)
+    update()
+end
+makeButton('killer','ESP Assassino',10)
+makeButton('survivor','ESP Sobreviventes',55)
+makeButton('generator','ESP Geradores',100)
+label(espPage,'Marcacoes visiveis atraves das paredes',UDim2.new(1,-20,0,34),UDim2.fromOffset(10,148),Enum.Font.Gotham,Color3.fromRGB(170,175,185)).TextSize = 11
+
+label(autoPage,'AUTO GERADOR',UDim2.new(1,-20,0,32),UDim2.fromOffset(12,10),Enum.Font.GothamBold)
+local autoButton = Instance.new('TextButton')
+autoButton.Size = UDim2.new(1,-24,0,42)
+autoButton.Position = UDim2.fromOffset(12,49)
+autoButton.BackgroundColor3 = Color3.fromRGB(54,56,67)
+autoButton.TextColor3 = Color3.fromRGB(245,245,245)
+autoButton.Font = Enum.Font.GothamSemibold
+autoButton.TextSize = 13
+autoButton.Parent = autoPage
+Instance.new('UICorner',autoButton).CornerRadius = UDim.new(0,7)
+local autoRequested = false
+local note = label(autoPage,'Auto desligado.',UDim2.new(1,-24,0,70),UDim2.fromOffset(12,104),Enum.Font.Gotham,Color3.fromRGB(195,195,205))
+note.TextWrapped = true
+note.TextYAlignment = Enum.TextYAlignment.Top
+note.TextSize = 12
+local currentCheck, previousError, previousGoal, triggered = nil,nil,nil,false
+local keyHeld = false
+local playerGui = LocalPlayer:WaitForChild('PlayerGui')
+local vimOK, VIM = pcall(function() return game:GetService('VirtualInputManager') end)
+local function resetCheck()
+    currentCheck, previousError, previousGoal, triggered = nil,nil,nil,false
+end
+local function updateAuto()
+    autoButton.Text = 'Auto Gerador V18 [' .. (autoRequested and 'ON' or 'OFF') .. ']'
+end
+listen(autoButton.MouseButton1Click,function()
+    autoRequested = not autoRequested
+    resetCheck()
+    updateAuto()
+    note.Text = autoRequested and 'Aguardando circulo de reparo...' or 'Auto desligado.'
+end)
+updateAuto()
+local function angleError(a,b)
+    return (a-b+180)%360-180
+end
+local function findCheck()
+    local promptGui = playerGui:FindFirstChild('SkillCheckPromptGui')
+    if not promptGui or not promptGui.Enabled then return nil end
+    local check = promptGui:FindFirstChild('Check')
+    if not check or not check:IsA('GuiObject') or not check.Visible then return nil end
+    local goal = check:FindFirstChild('Goal')
+    local line = check:FindFirstChild('Line')
+    if not goal or not line or not goal:IsA('GuiObject') or not line:IsA('GuiObject') then return nil end
+    if not goal.Visible or not line.Visible then return nil end
+    return check,goal,line
+end
+local function pressSpace()
+    if not vimOK or not VIM then return false end
+    local ok = pcall(function()
+        keyHeld = true
+        VIM:SendKeyEvent(true,Enum.KeyCode.Space,false,game)
+        task.delay(0.035,function()
+            pcall(function() VIM:SendKeyEvent(false,Enum.KeyCode.Space,false,game) end)
+            keyHeld = false
+        end)
+    end)
+    return ok
+end
+listen(RunService.RenderStepped,function()
+    if not autoRequested then return end
+    local check,goal,line = findCheck()
+    if not check then
+        resetCheck()
+        note.Text = 'Aguardando circulo de reparo...'
+        return
+    end
+    if currentCheck ~= check then
+        currentCheck = check
+        previousError,previousGoal,triggered = nil,nil,false
+    end
+    local target = (goal.Rotation+112)%360
+    local errorNow = angleError(line.Rotation,target)
+    if previousGoal ~= nil and math.abs(angleError(goal.Rotation,previousGoal))>5 then
+        previousError = nil
+    end
+    previousGoal = goal.Rotation
+    local closeEnough = math.abs(errorNow)<=2
+    local crossed = false
+    if previousError ~= nil then
+        local movement = angleError(errorNow,previousError)
+        if math.abs(previousError)<=8 and math.abs(errorNow)<=8 and math.abs(movement)<=16 then
+            crossed = (previousError<0 and errorNow>=0) or (previousError>0 and errorNow<=0)
+        end
+    end
+    previousError = errorNow
+    if triggered then
+        note.Text = 'Espaco acionado. Aguardando proxima rodada...'
+        return
+    end
+    note.Text = string.format('Acompanhando faixa branca.\nDistancia: %.1f graus',math.abs(errorNow))
+    if closeEnough or crossed then
+        triggered = true
+        local ok = pressSpace()
+        note.Text = ok and 'Espaco acionado! Aguardando proxima rodada...' or 'Falha ao enviar Espaco.'
+        print('[VD HUB V19] Auto gerador', 'Goal:',goal.Rotation,'Line:',line.Rotation,'Erro:',errorNow)
+    end
+end)
+listen(UIS.InputBegan,function(input,processed)
+    if not processed and input.KeyCode == Enum.KeyCode.RightShift then
+        frame.Visible = not frame.Visible
+    end
+end)
+
+local running = true
+-- Uma verificacao leve de recuperacao a cada 12 segundos, apenas com ESP ligado.
+task.spawn(function()
+    while running and gui.Parent do
+        task.wait(12)
+        if running and enabled.generator then
+            pcall(function()
+                rescanGeneratorMap()
+                refreshGenerators()
+            end)
+        end
+    end
+end)
+_G.VD_HUB_STOP = function()
+    if gui.Parent then gui:Destroy() end
+end
+listen(gui.Destroying,function()
+    running = false
+    autoRequested = false
+    if keyHeld and vimOK and VIM then pcall(function() VIM:SendKeyEvent(false,Enum.KeyCode.Space,false,game) end) end
+    for _,conn in ipairs(connections) do conn:Disconnect() end
+    for inst in pairs(marks) do clearMark(inst) end
+end)
+task.spawn(function()
+    while running and gui.Parent do
+        pcall(refreshPlayers)
+        task.wait(1)
+    end
+end)
+print('Violence District HUB V19 carregado. Auto V18 integrado; ESP geradores experimental.')

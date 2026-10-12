@@ -14,10 +14,10 @@ local KILLER_TEAMS = {killer=true, murderer=true, assassin=true, assassino=true}
 local SURVIVOR_TEAMS = {survivor=true, survivors=true, sobrevivente=true, sobreviventes=true}
 local GENERATOR_NAMES = {generator=true, generators=true, gerador=true, geradores=true}
 
-local previous = CoreGui:FindFirstChild('VDHubV23') or CoreGui:FindFirstChild('VDHubV22') or CoreGui:FindFirstChild('VDHubV21') or CoreGui:FindFirstChild('VDHubV20') or CoreGui:FindFirstChild('VDHubV19') or CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
+local previous = CoreGui:FindFirstChild('VDHubV27') or CoreGui:FindFirstChild('VDHubV26') or CoreGui:FindFirstChild('VDHubV25') or CoreGui:FindFirstChild('VDHubV24') or CoreGui:FindFirstChild('VDHubV23') or CoreGui:FindFirstChild('VDHubV22') or CoreGui:FindFirstChild('VDHubV21') or CoreGui:FindFirstChild('VDHubV20') or CoreGui:FindFirstChild('VDHubV19') or CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
 if previous then previous:Destroy() end
 local gui = Instance.new('ScreenGui')
-gui.Name = 'VDHubV25'
+gui.Name = 'VDHubV27'
 gui.ResetOnSpawn = false
 gui.Parent = CoreGui
 
@@ -51,7 +51,7 @@ local function label(parent, text, size, pos, font, color)
     l.Parent = parent
     return l
 end
-label(frame,'VIOLENCE DISTRICT HUB V25',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
+label(frame,'VIOLENCE DISTRICT HUB V27',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
 -- Controles da janela: minimizar, fechar e esconder com CTRL.
 local function windowButton(symbol, x, bg)
     local b = Instance.new('TextButton')
@@ -174,21 +174,61 @@ local function getHumanoid()
     local char = LocalPlayer.Character
     return char and char:FindFirstChildOfClass('Humanoid')
 end
-local function applySpeed()
-    local hum = getHumanoid()
-    if not hum then return end
-    if originalSpeeds[hum] == nil then
-        originalSpeeds[hum] = hum.WalkSpeed
-    end
-    hum.WalkSpeed = speedValue
+-- Atualizacao orientada a eventos, sem loop de velocidade por frame.
+local speedHumanoid, speedConnection = nil, nil
+local speedChanges = 0
+local speedWindowStart = os.clock()
+local speedLimited = false
+local function detachSpeed()
+    if speedConnection then speedConnection:Disconnect(); speedConnection = nil end
+    speedHumanoid = nil
 end
 local function restoreSpeed()
+    detachSpeed()
     for hum, old in pairs(originalSpeeds) do
         if hum and hum.Parent then
             pcall(function() hum.WalkSpeed = old end)
         end
         originalSpeeds[hum] = nil
     end
+    speedLimited = false
+end
+local function attachSpeed(hum)
+    if speedHumanoid == hum then return end
+    detachSpeed()
+    speedHumanoid = hum
+    if originalSpeeds[hum] == nil then originalSpeeds[hum] = hum.WalkSpeed end
+    speedChanges, speedWindowStart, speedLimited = 0, os.clock(), false
+    speedConnection = hum:GetPropertyChangedSignal('WalkSpeed'):Connect(function()
+        if not speedEnabled or speedLimited or not hum.Parent then return end
+        if math.abs(hum.WalkSpeed - speedValue) < 0.1 then return end
+        local now = os.clock()
+        if now - speedWindowStart > 2 then
+            speedWindowStart, speedChanges = now, 0
+        end
+        speedChanges = speedChanges + 1
+        -- Nao disputa indefinidamente com o controlador do jogo.
+        if speedChanges > 6 then
+            speedLimited = true
+            speedNote.Text = 'Partida controla a velocidade. Ajuste suspenso para evitar travadas.'
+            return
+        end
+        task.defer(function()
+            if speedEnabled and not speedLimited and speedHumanoid == hum and hum.Parent then
+                hum.WalkSpeed = speedValue
+            end
+        end)
+    end)
+end
+local function applySpeed()
+    local hum = getHumanoid()
+    if not hum then return end
+    attachSpeed(hum)
+    if speedLimited then
+        speedLimited = false
+        speedChanges, speedWindowStart = 0, os.clock()
+    end
+    hum.WalkSpeed = speedValue
 end
 local function updateSpeedUI()
     speedButton.Text = 'Velocidade [' .. (speedEnabled and 'ON' or 'OFF') .. ']'
@@ -245,9 +285,7 @@ listen(LocalPlayer.CharacterAdded,function()
 end)
 updateSpeedUI()
 
--- V24: nao disputar WalkSpeed continuamente com o controlador da partida.
--- A alteracao e tentada apenas quando o usuario liga ou ajusta o controle.
--- Se o jogo impor outro valor, a interface informa que o ajuste pode ser limitado.
+-- V27: observa alteracoes de WalkSpeed e limita tentativas em caso de conflito.
 local enabled = {killer=false,survivor=false,generator=false}
 local colors = {killer=Color3.fromRGB(255,65,65),survivor=Color3.fromRGB(55,235,100),generator=Color3.fromRGB(255,255,255)}
 local marks = {}
@@ -472,6 +510,9 @@ local note = label(autoPage,'Auto desligado.',UDim2.new(1,-24,0,70),UDim2.fromOf
 note.TextWrapped = true
 note.TextYAlignment = Enum.TextYAlignment.Top
 note.TextSize = 12
+local function setAutoNote(message)
+    if note.Text ~= message then note.Text = message end
+end
 local currentCheck, previousError, previousGoal, triggered = nil,nil,nil,false
 local keyHeld = false
 local playerGui = LocalPlayer:WaitForChild('PlayerGui')
@@ -486,7 +527,7 @@ listen(autoButton.MouseButton1Click,function()
     autoRequested = not autoRequested
     resetCheck()
     updateAuto()
-    note.Text = autoRequested and 'Aguardando circulo de reparo...' or 'Auto desligado.'
+    setAutoNote(autoRequested and 'Aguardando circulo de reparo...' or 'Auto desligado.')
 end)
 updateAuto()
 local function angleError(a,b)
@@ -520,7 +561,7 @@ listen(RunService.RenderStepped,function()
     local check,goal,line = findCheck()
     if not check then
         resetCheck()
-        note.Text = 'Aguardando circulo de reparo...'
+        setAutoNote('Aguardando circulo de reparo...')
         return
     end
     if currentCheck ~= check then
@@ -543,15 +584,16 @@ listen(RunService.RenderStepped,function()
     end
     previousError = errorNow
     if triggered then
-        note.Text = 'Espaco acionado. Aguardando proxima rodada...'
+        setAutoNote('Espaco acionado. Aguardando proxima rodada...')
         return
     end
-    note.Text = string.format('Acompanhando faixa branca.\nDistancia: %.1f graus',math.abs(errorNow))
+    -- Evita formatar e redesenhar texto em todo frame.
+    -- O calculo de angulo permanece por frame para preservar o timing.
     if closeEnough or crossed then
         triggered = true
         local ok = pressSpace()
-        note.Text = ok and 'Espaco acionado! Aguardando proxima rodada...' or 'Falha ao enviar Espaco.'
-        print('[VD HUB V20] Auto gerador', 'Goal:',goal.Rotation,'Line:',line.Rotation,'Erro:',errorNow)
+        setAutoNote(ok and 'Espaco acionado! Aguardando proxima rodada...' or 'Falha ao enviar Espaco.')
+        print('[VD HUB V27] Auto gerador', 'Goal:',goal.Rotation,'Line:',line.Rotation,'Erro:',errorNow)
     end
 end)
 listen(UIS.InputBegan,function(input,processed)
@@ -595,4 +637,4 @@ task.spawn(function()
         task.wait(1)
     end
 end)
-print('Violence District HUB V25: velocidade ajustavel, CTRL oculta/mostra; - minimiza; X fecha.')
+print('Violence District HUB V27: velocidade ajustavel, CTRL oculta/mostra; - minimiza; X fecha.')

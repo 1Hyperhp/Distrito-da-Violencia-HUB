@@ -14,10 +14,10 @@ local KILLER_TEAMS = {killer=true, murderer=true, assassin=true, assassino=true}
 local SURVIVOR_TEAMS = {survivor=true, survivors=true, sobrevivente=true, sobreviventes=true}
 local GENERATOR_NAMES = {generator=true, generators=true, gerador=true, geradores=true}
 
-local previous = CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
+local previous = CoreGui:FindFirstChild('VDHubV21') or CoreGui:FindFirstChild('VDHubV20') or CoreGui:FindFirstChild('VDHubV19') or CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
 if previous then previous:Destroy() end
 local gui = Instance.new('ScreenGui')
-gui.Name = 'VDHubV19'
+gui.Name = 'VDHubV22'
 gui.ResetOnSpawn = false
 gui.Parent = CoreGui
 
@@ -51,7 +51,27 @@ local function label(parent, text, size, pos, font, color)
     l.Parent = parent
     return l
 end
-label(frame,'VIOLENCE DISTRICT HUB V19',UDim2.new(1,-24,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
+label(frame,'VIOLENCE DISTRICT HUB V22',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
+-- Controles da janela: minimizar, fechar e esconder com CTRL.
+local function windowButton(symbol, x, bg)
+    local b = Instance.new('TextButton')
+    b.Name = symbol == 'X' and 'CloseButton' or 'MinimizeButton'
+    b.Size = UDim2.fromOffset(27,26)
+    b.Position = UDim2.fromOffset(x,7)
+    b.BackgroundColor3 = bg
+    b.BorderSizePixel = 0
+    b.Text = symbol
+    b.TextColor3 = Color3.new(1,1,1)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 16
+    b.Parent = frame
+    Instance.new('UICorner',b).CornerRadius = UDim.new(0,6)
+    return b
+end
+local minimizeButton = windowButton('-',365,Color3.fromRGB(65,70,85))
+local closeButton = windowButton('X',397,Color3.fromRGB(160,55,60))
+local minimized = false
+
 local sidebar = Instance.new('Frame')
 sidebar.Size = UDim2.fromOffset(110,202)
 sidebar.Position = UDim2.fromOffset(9,43)
@@ -65,11 +85,29 @@ content.Position = UDim2.fromOffset(125,43)
 content.BackgroundColor3 = Color3.fromRGB(31,33,42)
 content.BorderSizePixel = 0
 content.Parent = frame
+listen(minimizeButton.MouseButton1Click,function()
+    minimized = not minimized
+    frame.Size = UDim2.fromOffset(430,minimized and 40 or 255)
+    sidebar.Visible = not minimized
+    content.Visible = not minimized
+    minimizeButton.Text = minimized and '+' or '-'
+end)
+listen(closeButton.MouseButton1Click,function()
+    if type(_G.VD_HUB_STOP) == 'function' then _G.VD_HUB_STOP() end
+end)
 Instance.new('UICorner',content).CornerRadius = UDim.new(0,8)
-local espPage = Instance.new('Frame')
+local espPage = Instance.new('ScrollingFrame')
 espPage.Size = UDim2.fromScale(1,1)
 espPage.BackgroundTransparency = 1
+espPage.BorderSizePixel = 0
+espPage.ScrollBarThickness = 5
+espPage.CanvasSize = UDim2.fromOffset(0,405)
 espPage.Parent = content
+local speedPage = Instance.new('Frame')
+speedPage.Size = UDim2.new(1,0,0,195)
+speedPage.Position = UDim2.fromOffset(0,200)
+speedPage.BackgroundTransparency = 1
+speedPage.Parent = espPage
 local autoPage = Instance.new('Frame')
 autoPage.Size = UDim2.fromScale(1,1)
 autoPage.BackgroundTransparency = 1
@@ -87,12 +125,125 @@ local function sideButton(text, y, page)
     b.Parent = sidebar
     Instance.new('UICorner',b).CornerRadius = UDim.new(0,7)
     listen(b.MouseButton1Click,function()
-        espPage.Visible = page == 'ESP'
+        espPage.Visible = page == 'Survival'
         autoPage.Visible = page == 'Auto'
     end)
 end
-sideButton('ESP',10,'ESP')
+sideButton('Survival',10,'Survival')
 sideButton('Auto',57,'Auto')
+
+-- Controle de velocidade (WalkSpeed)
+label(speedPage,'VELOCIDADE',UDim2.new(1,-24,0,30),UDim2.fromOffset(12,8),Enum.Font.GothamBold)
+local speedEnabled = false
+local speedValue = 16
+local speedMin, speedMax = 16, 50
+local originalSpeeds = {}
+local speedButton = Instance.new('TextButton')
+speedButton.Size = UDim2.new(1,-24,0,34)
+speedButton.Position = UDim2.fromOffset(12,40)
+speedButton.BackgroundColor3 = Color3.fromRGB(54,56,67)
+speedButton.TextColor3 = Color3.new(1,1,1)
+speedButton.Font = Enum.Font.GothamSemibold
+speedButton.TextSize = 13
+speedButton.Parent = speedPage
+Instance.new('UICorner',speedButton).CornerRadius = UDim.new(0,7)
+local speedText = label(speedPage,'Velocidade: 16',UDim2.new(1,-24,0,25),UDim2.fromOffset(12,81),Enum.Font.Gotham)
+local track = Instance.new('Frame')
+track.Size = UDim2.new(1,-36,0,9)
+track.Position = UDim2.fromOffset(18,118)
+track.BackgroundColor3 = Color3.fromRGB(75,78,95)
+track.Parent = speedPage
+Instance.new('UICorner',track).CornerRadius = UDim.new(1,0)
+local fill = Instance.new('Frame')
+fill.Size = UDim2.fromScale(0,1)
+fill.BackgroundColor3 = Color3.fromRGB(80,190,125)
+fill.Parent = track
+Instance.new('UICorner',fill).CornerRadius = UDim.new(1,0)
+local knob = Instance.new('TextButton')
+knob.Size = UDim2.fromOffset(20,20)
+knob.AnchorPoint = Vector2.new(.5,.5)
+knob.Position = UDim2.fromScale(0,.5)
+knob.Text = ''
+knob.BackgroundColor3 = Color3.fromRGB(235,240,245)
+knob.Parent = track
+Instance.new('UICorner',knob).CornerRadius = UDim.new(1,0)
+local speedNote = label(speedPage,'Arraste a bolinha para ajustar.',UDim2.new(1,-24,0,38),UDim2.fromOffset(12,148),Enum.Font.Gotham,Color3.fromRGB(180,185,195))
+speedNote.TextWrapped = true
+speedNote.TextSize = 11
+local function getHumanoid()
+    local char = LocalPlayer.Character
+    return char and char:FindFirstChildOfClass('Humanoid')
+end
+local function applySpeed()
+    local hum = getHumanoid()
+    if not hum then return end
+    if originalSpeeds[hum] == nil then
+        originalSpeeds[hum] = hum.WalkSpeed
+    end
+    hum.WalkSpeed = speedValue
+end
+local function restoreSpeed()
+    for hum, old in pairs(originalSpeeds) do
+        if hum and hum.Parent then
+            pcall(function() hum.WalkSpeed = old end)
+        end
+        originalSpeeds[hum] = nil
+    end
+end
+local function updateSpeedUI()
+    speedButton.Text = 'Velocidade [' .. (speedEnabled and 'ON' or 'OFF') .. ']'
+    speedText.Text = 'Velocidade: ' .. speedValue
+    local fraction = (speedValue-speedMin)/(speedMax-speedMin)
+    fill.Size = UDim2.fromScale(fraction,1)
+    knob.Position = UDim2.fromScale(fraction,.5)
+end
+listen(speedButton.MouseButton1Click,function()
+    speedEnabled = not speedEnabled
+    if speedEnabled then
+        applySpeed()
+        speedNote.Text = 'Ativo durante a partida.'
+    else
+        restoreSpeed()
+        speedNote.Text = 'Desligado. Velocidade restaurada.'
+    end
+    updateSpeedUI()
+end)
+local draggingSpeed = false
+local function setSpeedFromX(x)
+    local width = track.AbsoluteSize.X
+    if width <= 0 then return end
+    local fraction = math.clamp((x-track.AbsolutePosition.X)/width,0,1)
+    speedValue = math.floor(speedMin+fraction*(speedMax-speedMin)+.5)
+    updateSpeedUI()
+    if speedEnabled then applySpeed() end
+end
+listen(knob.MouseButton1Down,function() draggingSpeed = true end)
+listen(track.InputBegan,function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        draggingSpeed = true
+        setSpeedFromX(input.Position.X)
+    end
+end)
+listen(UIS.InputChanged,function(input)
+    if draggingSpeed and input.UserInputType == Enum.UserInputType.MouseMovement then
+        setSpeedFromX(input.Position.X)
+    end
+end)
+listen(UIS.InputEnded,function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        draggingSpeed = false
+    end
+end)
+listen(LocalPlayer.CharacterAdded,function()
+    if speedEnabled then
+        task.defer(function()
+            local char = LocalPlayer.Character
+            if char then char:WaitForChild('Humanoid',10) end
+            if speedEnabled then applySpeed() end
+        end)
+    end
+end)
+updateSpeedUI()
 
 local enabled = {killer=false,survivor=false,generator=false}
 local colors = {killer=Color3.fromRGB(255,65,65),survivor=Color3.fromRGB(55,235,100),generator=Color3.fromRGB(255,255,255)}
@@ -274,7 +425,7 @@ local function resetCheck()
     currentCheck, previousError, previousGoal, triggered = nil,nil,nil,false
 end
 local function updateAuto()
-    autoButton.Text = 'Auto Gerador V18 [' .. (autoRequested and 'ON' or 'OFF') .. ']'
+    autoButton.Text = 'Auto Gerador [' .. (autoRequested and 'ON' or 'OFF') .. ']'
 end
 listen(autoButton.MouseButton1Click,function()
     autoRequested = not autoRequested
@@ -345,11 +496,13 @@ listen(RunService.RenderStepped,function()
         triggered = true
         local ok = pressSpace()
         note.Text = ok and 'Espaco acionado! Aguardando proxima rodada...' or 'Falha ao enviar Espaco.'
-        print('[VD HUB V19] Auto gerador', 'Goal:',goal.Rotation,'Line:',line.Rotation,'Erro:',errorNow)
+        print('[VD HUB V20] Auto gerador', 'Goal:',goal.Rotation,'Line:',line.Rotation,'Erro:',errorNow)
     end
 end)
 listen(UIS.InputBegan,function(input,processed)
-    if not processed and input.KeyCode == Enum.KeyCode.RightShift then
+    if not processed and (input.KeyCode == Enum.KeyCode.LeftControl
+        or input.KeyCode == Enum.KeyCode.RightControl
+        or input.KeyCode == Enum.KeyCode.RightShift) then
         frame.Visible = not frame.Visible
     end
 end)
@@ -373,6 +526,8 @@ end
 listen(gui.Destroying,function()
     running = false
     autoRequested = false
+    speedEnabled = false
+    restoreSpeed()
     if keyHeld and vimOK and VIM then pcall(function() VIM:SendKeyEvent(false,Enum.KeyCode.Space,false,game) end) end
     for _,conn in ipairs(connections) do conn:Disconnect() end
     for inst in pairs(marks) do clearMark(inst) end
@@ -383,4 +538,4 @@ task.spawn(function()
         task.wait(1)
     end
 end)
-print('Violence District HUB V19 carregado. Auto V18 integrado; ESP geradores experimental.')
+print('Violence District HUB V22: velocidade ajustavel, CTRL oculta/mostra; - minimiza; X fecha.')

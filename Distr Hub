@@ -15,10 +15,10 @@ local KILLER_TEAMS = {killer=true, murderer=true, assassin=true, assassino=true}
 local SURVIVOR_TEAMS = {survivor=true, survivors=true, sobrevivente=true, sobreviventes=true}
 local GENERATOR_NAMES = {generator=true, generators=true, gerador=true, geradores=true}
 
-local previous = CoreGui:FindFirstChild('VDHubV27') or CoreGui:FindFirstChild('VDHubV26') or CoreGui:FindFirstChild('VDHubV25') or CoreGui:FindFirstChild('VDHubV24') or CoreGui:FindFirstChild('VDHubV23') or CoreGui:FindFirstChild('VDHubV22') or CoreGui:FindFirstChild('VDHubV21') or CoreGui:FindFirstChild('VDHubV20') or CoreGui:FindFirstChild('VDHubV19') or CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
+local previous = CoreGui:FindFirstChild('VDHubV35') or CoreGui:FindFirstChild('VDHubV34') or CoreGui:FindFirstChild('VDHubV33') or CoreGui:FindFirstChild('VDHubV27') or CoreGui:FindFirstChild('VDHubV26') or CoreGui:FindFirstChild('VDHubV25') or CoreGui:FindFirstChild('VDHubV24') or CoreGui:FindFirstChild('VDHubV23') or CoreGui:FindFirstChild('VDHubV22') or CoreGui:FindFirstChild('VDHubV21') or CoreGui:FindFirstChild('VDHubV20') or CoreGui:FindFirstChild('VDHubV19') or CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
 if previous then previous:Destroy() end
 local gui = Instance.new('ScreenGui')
-gui.Name = 'VDHubV33'
+gui.Name = 'VDHubV35'
 gui.ResetOnSpawn = false
 gui.Parent = CoreGui
 
@@ -52,7 +52,7 @@ local function label(parent, text, size, pos, font, color)
     l.Parent = parent
     return l
 end
-label(frame,'VIOLENCE DISTRICT HUB V33',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
+label(frame,'VIOLENCE DISTRICT HUB V35',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
 -- Controles da janela: minimizar, fechar e esconder com CTRL.
 local function windowButton(symbol, x, bg)
     local b = Instance.new('TextButton')
@@ -273,7 +273,7 @@ attachSpeed(getHumanoid())
 updateSpeedUI()
 
 local enabled = {killer=false,survivor=false,generator=false}
-local colors = {killer=Color3.fromRGB(255,65,65),survivor=Color3.fromRGB(55,235,100),generator=Color3.fromRGB(255,255,255)}
+local colors = {killer=Color3.fromRGB(255,65,65),survivor=Color3.fromRGB(165,85,255),generator=Color3.fromRGB(255,255,255)}
 local marks = {}
 local generators = {}
 local completedGenerators = {}
@@ -364,34 +364,41 @@ local completionNames = {
     concluido=true, concluida=true, reparado=true, reparada=true,
     fullyrepaired=true,
 }
-local progressNames = {progress=true, repairprogress=true, completion=true, repairpercentage=true}
-local function completionValue(name,value)
-    local normalized = tostring(name):lower():gsub('[^%a]','')
-    if completionNames[normalized] then
-        return value == true or value == 1 or value == 'true'
+-- Conservador: valores genericos de progresso (0..1) nao provam conclusao.
+-- Aceita apenas sinalizadores explicitos no proprio gerador e em filhos diretos.
+local function completedFlag(name, value)
+    local normalized = tostring(name):lower():gsub('[^%a]', '')
+    if not completionNames[normalized] then return false end
+    return value == true or value == 1 or value == 'true'
+end
+local function checkCompletionNode(node)
+    for name, value in pairs(node:GetAttributes()) do
+        if completedFlag(name, value) then return true end
     end
-    if progressNames[normalized] and type(value)=='number' then
-        return value >= (normalized == 'repairpercentage' and 100 or 1)
+    for _, child in ipairs(node:GetChildren()) do
+        if (child:IsA('BoolValue') or child:IsA('IntValue') or child:IsA('NumberValue'))
+            and completedFlag(child.Name, child.Value) then
+            return true
+        end
     end
     return false
 end
 local function isCompletedGenerator(obj)
-    local nodes = {obj}
-    for _, d in ipairs(obj:GetDescendants()) do
-        if d:IsA('BoolValue') or d:IsA('NumberValue') or d:IsA('IntValue') then
-            if completionValue(d.Name,d.Value) then return true end
-        end
-        if d:IsA('Model') or d:IsA('BasePart') then
-            nodes[#nodes+1] = d
-        end
-    end
-    for _, node in ipairs(nodes) do
-        for name,value in pairs(node:GetAttributes()) do
-            if completionValue(name,value) then return true end
+    if checkCompletionNode(obj) then return true end
+    -- Apenas filhos diretos relevantes: evita confundir progresso de pecas,
+    -- objetivos secundarios ou outros geradores agrupados.
+    for _, child in ipairs(obj:GetChildren()) do
+        if child:IsA('Model') or child:IsA('Folder') then
+            local name = child.Name:lower()
+            if name:find('status',1,true) or name:find('state',1,true)
+                or name:find('repair',1,true) or name:find('progress',1,true) then
+                if checkCompletionNode(child) then return true end
+            end
         end
     end
     return false
 end
+
 local function registerGenerator(obj)
     if generators[obj] then return end
     if isGenerator(obj) then
@@ -401,14 +408,11 @@ local function registerGenerator(obj)
     end
 end
 local function rescanGeneratorMap()
-    -- Varredura sob demanda e em intervalos longos, nunca por frame.
+    -- Uma varredura por ciclo, evitando dois GetDescendants completos.
     for _, obj in ipairs(workspace:GetDescendants()) do
         if (obj:IsA('Model') or obj:IsA('BasePart')) and genHint(obj.Name) then
             registerGenerator(obj)
-        end
-    end
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA('ProximityPrompt') then
+        elseif obj:IsA('ProximityPrompt') then
             local phrase = (obj.Name..' '..obj.ActionText..' '..obj.ObjectText):lower()
             if phrase:find('repair',1,true) or phrase:find('repar',1,true) then
                 local parent = obj.Parent
@@ -421,6 +425,7 @@ local function rescanGeneratorMap()
         end
     end
 end
+
 local function refreshGenerators()
     for inst in pairs(generators) do
         if not inst:IsDescendantOf(workspace) then
@@ -579,7 +584,7 @@ listen(RunService.RenderStepped,function()
         triggered = true
         local ok = pressSpace()
         setAutoNote(ok and 'Espaco acionado! Aguardando proxima rodada...' or 'Falha ao enviar Espaco.')
-        print('[VD HUB V33] Auto gerador', 'Goal:',goal.Rotation,'Line:',line.Rotation,'Erro:',errorNow)
+        print('[VD HUB V35] Auto gerador', 'Goal:',goal.Rotation,'Line:',line.Rotation,'Erro:',errorNow)
     end
 end)
 listen(UIS.InputBegan,function(input,processed)
@@ -624,4 +629,4 @@ task.spawn(function()
         task.wait(1)
     end
 end)
-print('Violence District HUB V33: multiplicador dinamico, CTRL oculta/mostra; - minimiza; X fecha.')
+print('Violence District HUB V35: multiplicador dinamico, CTRL oculta/mostra; - minimiza; X fecha.')

@@ -14,10 +14,10 @@ local KILLER_TEAMS = {killer=true, murderer=true, assassin=true, assassino=true}
 local SURVIVOR_TEAMS = {survivor=true, survivors=true, sobrevivente=true, sobreviventes=true}
 local GENERATOR_NAMES = {generator=true, generators=true, gerador=true, geradores=true}
 
-local previous = CoreGui:FindFirstChild('VDHubV22') or CoreGui:FindFirstChild('VDHubV21') or CoreGui:FindFirstChild('VDHubV20') or CoreGui:FindFirstChild('VDHubV19') or CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
+local previous = CoreGui:FindFirstChild('VDHubV23') or CoreGui:FindFirstChild('VDHubV22') or CoreGui:FindFirstChild('VDHubV21') or CoreGui:FindFirstChild('VDHubV20') or CoreGui:FindFirstChild('VDHubV19') or CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
 if previous then previous:Destroy() end
 local gui = Instance.new('ScreenGui')
-gui.Name = 'VDHubV23'
+gui.Name = 'VDHubV25'
 gui.ResetOnSpawn = false
 gui.Parent = CoreGui
 
@@ -51,7 +51,7 @@ local function label(parent, text, size, pos, font, color)
     l.Parent = parent
     return l
 end
-label(frame,'VIOLENCE DISTRICT HUB V23',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
+label(frame,'VIOLENCE DISTRICT HUB V25',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
 -- Controles da janela: minimizar, fechar e esconder com CTRL.
 local function windowButton(symbol, x, bg)
     local b = Instance.new('TextButton')
@@ -201,7 +201,7 @@ listen(speedButton.MouseButton1Click,function()
     speedEnabled = not speedEnabled
     if speedEnabled then
         applySpeed()
-        speedNote.Text = 'Mantem o ajuste ao usar e soltar Shift.'
+        speedNote.Text = 'Ajuste solicitado. O jogo pode limitar na partida.'
     else
         restoreSpeed()
         speedNote.Text = 'Desligado. Velocidade restaurada.'
@@ -245,24 +245,14 @@ listen(LocalPlayer.CharacterAdded,function()
 end)
 updateSpeedUI()
 
--- O sprint do jogo pode reescrever WalkSpeed ao pressionar/soltar Shift.
--- Checagem moderada, somente quando a opcao esta ligada.
-task.spawn(function()
-    while gui.Parent do
-        if speedEnabled then
-            local hum = getHumanoid()
-            if hum and hum.Health > 0 and math.abs(hum.WalkSpeed - speedValue) > 0.05 then
-                pcall(applySpeed)
-            end
-        end
-        task.wait(0.12)
-    end
-end)
-
+-- V24: nao disputar WalkSpeed continuamente com o controlador da partida.
+-- A alteracao e tentada apenas quando o usuario liga ou ajusta o controle.
+-- Se o jogo impor outro valor, a interface informa que o ajuste pode ser limitado.
 local enabled = {killer=false,survivor=false,generator=false}
 local colors = {killer=Color3.fromRGB(255,65,65),survivor=Color3.fromRGB(55,235,100),generator=Color3.fromRGB(255,255,255)}
 local marks = {}
 local generators = {}
+local completedGenerators = {}
 
 local function clearMark(inst)
     local h = marks[inst]
@@ -284,8 +274,9 @@ local function mark(inst,kind)
         h.Parent = gui
         marks[inst] = h
     end
-    h.FillColor = colors[kind]
-    h.OutlineColor = colors[kind]
+    local color = (kind == 'generator' and completedGenerators[inst]) and Color3.fromRGB(55,235,100) or colors[kind]
+    h.FillColor = color
+    h.OutlineColor = color
 end
 local function role(player)
     local teamName = player.Team and player.Team.Name:lower() or ''
@@ -332,7 +323,7 @@ end
 local function isGenerator(obj)
     if not (obj:IsA('Model') or obj:IsA('BasePart')) then return false end
     if not obj:IsDescendantOf(workspace) then return false end
-    local hint = genHint(obj.Name) or hasRepairPrompt(obj)
+    local hint = genHint(obj.Name) or (obj:IsA('Model') and hasRepairPrompt(obj))
     if not hint then return false end
     -- Prefere o modelo inteiro, quando o nome do pai identifica o mesmo gerador.
     local parent = obj.Parent
@@ -341,26 +332,79 @@ local function isGenerator(obj)
     end
     return true
 end
+-- Le indicadores explicitos de conclusao sem presumir que um prompt desativado
+-- significa gerador concluido (pode estar fora de alcance ou bloqueado).
+local completionNames = {
+    completed=true, complete=true, finished=true, repaired=true,
+    iscompleted=true, iscomplete=true, isrepaired=true,
+    concluido=true, concluida=true, reparado=true, reparada=true,
+    fullyrepaired=true,
+}
+local progressNames = {progress=true, repairprogress=true, completion=true, repairpercentage=true}
+local function completionValue(name,value)
+    local normalized = tostring(name):lower():gsub('[^%a]','')
+    if completionNames[normalized] then
+        return value == true or value == 1 or value == 'true'
+    end
+    if progressNames[normalized] and type(value)=='number' then
+        return value >= (normalized == 'repairpercentage' and 100 or 1)
+    end
+    return false
+end
+local function isCompletedGenerator(obj)
+    local nodes = {obj}
+    for _, d in ipairs(obj:GetDescendants()) do
+        if d:IsA('BoolValue') or d:IsA('NumberValue') or d:IsA('IntValue') then
+            if completionValue(d.Name,d.Value) then return true end
+        end
+        if d:IsA('Model') or d:IsA('BasePart') then
+            nodes[#nodes+1] = d
+        end
+    end
+    for _, node in ipairs(nodes) do
+        for name,value in pairs(node:GetAttributes()) do
+            if completionValue(name,value) then return true end
+        end
+    end
+    return false
+end
 local function registerGenerator(obj)
+    if generators[obj] then return end
     if isGenerator(obj) then
         generators[obj] = true
+        completedGenerators[obj] = isCompletedGenerator(obj)
         if enabled.generator then mark(obj,'generator') end
     end
 end
 local function rescanGeneratorMap()
     -- Varredura sob demanda e em intervalos longos, nunca por frame.
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA('Model') or obj:IsA('BasePart') then
+        if (obj:IsA('Model') or obj:IsA('BasePart')) and genHint(obj.Name) then
             registerGenerator(obj)
+        end
+    end
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA('ProximityPrompt') then
+            local phrase = (obj.Name..' '..obj.ActionText..' '..obj.ObjectText):lower()
+            if phrase:find('repair',1,true) or phrase:find('repar',1,true) then
+                local parent = obj.Parent
+                for _ = 1, 4 do
+                    if not parent or parent == workspace then break end
+                    if parent:IsA('Model') then registerGenerator(parent); break end
+                    parent = parent.Parent
+                end
+            end
         end
     end
 end
 local function refreshGenerators()
     for inst in pairs(generators) do
-        if not inst:IsDescendantOf(workspace) or not isGenerator(inst) then
+        if not inst:IsDescendantOf(workspace) then
             generators[inst] = nil
+            completedGenerators[inst] = nil
             clearMark(inst)
         elseif enabled.generator then
+            completedGenerators[inst] = isCompletedGenerator(inst)
             mark(inst,'generator')
         else
             clearMark(inst)
@@ -368,27 +412,24 @@ local function refreshGenerators()
     end
 end
 rescanGeneratorMap()
+-- Eventos leves: registra candidatos novos sem varrer subarvores a cada insercao.
 listen(workspace.DescendantAdded,function(obj)
-    if obj:IsA('Model') or obj:IsA('BasePart') then registerGenerator(obj) end
-    if obj:IsA('ProximityPrompt') or obj:IsA('Model') or obj:IsA('Folder') then
+    if (obj:IsA('Model') or obj:IsA('BasePart')) and genHint(obj.Name) then
+        registerGenerator(obj)
+    elseif obj:IsA('ProximityPrompt') then
         task.defer(function()
             if not gui.Parent then return end
-            local ancestor = obj
+            local ancestor = obj.Parent
             for _ = 1, 5 do
                 if not ancestor or ancestor == workspace then break end
                 if ancestor:IsA('Model') then registerGenerator(ancestor) end
                 ancestor = ancestor.Parent
             end
-            if obj:IsA('Model') or obj:IsA('Folder') then
-                for _,child in ipairs(obj:GetDescendants()) do
-                    if child:IsA('Model') or child:IsA('BasePart') then registerGenerator(child) end
-                end
-            end
         end)
     end
 end)
 listen(workspace.DescendantRemoving,function(obj)
-    if generators[obj] then generators[obj] = nil; clearMark(obj) end
+    if generators[obj] then generators[obj] = nil; completedGenerators[obj] = nil; clearMark(obj) end
 end)
 local function makeButton(key,title,y)
     local b = Instance.new('TextButton')
@@ -522,15 +563,17 @@ listen(UIS.InputBegan,function(input,processed)
 end)
 
 local running = true
--- Uma verificacao leve de recuperacao a cada 12 segundos, apenas com ESP ligado.
+-- Atualiza cor apenas dos geradores ja identificados; varredura completa rara.
 task.spawn(function()
+    local tickCount = 0
     while running and gui.Parent do
-        task.wait(12)
+        task.wait(2.5)
         if running and enabled.generator then
-            pcall(function()
-                rescanGeneratorMap()
-                refreshGenerators()
-            end)
+            tickCount = tickCount + 1
+            pcall(refreshGenerators)
+            if tickCount % 8 == 0 then
+                pcall(rescanGeneratorMap)
+            end
         end
     end
 end)
@@ -552,4 +595,4 @@ task.spawn(function()
         task.wait(1)
     end
 end)
-print('Violence District HUB V23: velocidade ajustavel, CTRL oculta/mostra; - minimiza; X fecha.')
+print('Violence District HUB V25: velocidade ajustavel, CTRL oculta/mostra; - minimiza; X fecha.')

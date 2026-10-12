@@ -6,6 +6,7 @@ local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService('CoreGui')
 local RunService = game:GetService('RunService')
 if type(_G.VD_HUB_STOP) == 'function' then pcall(_G.VD_HUB_STOP) end
+if type(_G.VD_V32_STOP) == 'function' then pcall(_G.VD_V32_STOP) end
 for _, v in ipairs({'VD_V16_STOP','VD_V17_STOP','VD_V18_STOP'}) do
     if type(_G[v]) == 'function' then pcall(_G[v]) end
 end
@@ -17,7 +18,7 @@ local GENERATOR_NAMES = {generator=true, generators=true, gerador=true, geradore
 local previous = CoreGui:FindFirstChild('VDHubV27') or CoreGui:FindFirstChild('VDHubV26') or CoreGui:FindFirstChild('VDHubV25') or CoreGui:FindFirstChild('VDHubV24') or CoreGui:FindFirstChild('VDHubV23') or CoreGui:FindFirstChild('VDHubV22') or CoreGui:FindFirstChild('VDHubV21') or CoreGui:FindFirstChild('VDHubV20') or CoreGui:FindFirstChild('VDHubV19') or CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
 if previous then previous:Destroy() end
 local gui = Instance.new('ScreenGui')
-gui.Name = 'VDHubV27'
+gui.Name = 'VDHubV33'
 gui.ResetOnSpawn = false
 gui.Parent = CoreGui
 
@@ -51,7 +52,7 @@ local function label(parent, text, size, pos, font, color)
     l.Parent = parent
     return l
 end
-label(frame,'VIOLENCE DISTRICT HUB V27',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
+label(frame,'VIOLENCE DISTRICT HUB V33',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
 -- Controles da janela: minimizar, fechar e esconder com CTRL.
 local function windowButton(symbol, x, bg)
     local b = Instance.new('TextButton')
@@ -132,12 +133,15 @@ end
 sideButton('Survival',10,'Survival')
 sideButton('Auto',57,'Auto')
 
--- Controle de velocidade (WalkSpeed)
-label(speedPage,'VELOCIDADE',UDim2.new(1,-24,0,30),UDim2.fromOffset(12,8),Enum.Font.GothamBold)
+-- V33: multiplicador dinamico baseado no teste V32 confirmado pelo usuario.
+-- Usa eventos de WalkSpeed, sem polling nem loop de escrita.
+label(speedPage,'MULTIPLICADOR DE VELOCIDADE',UDim2.new(1,-24,0,30),UDim2.fromOffset(12,8),Enum.Font.GothamBold)
 local speedEnabled = false
-local speedValue = 16
-local speedMin, speedMax = 16, 50
-local originalSpeeds = {}
+local multiplier = 1.51
+local speedMin, speedMax = 1, 2
+local speedHumanoid, speedConnection
+local lastBase, lastApplied
+local ownWrite = false
 local speedButton = Instance.new('TextButton')
 speedButton.Size = UDim2.new(1,-24,0,34)
 speedButton.Position = UDim2.fromOffset(12,40)
@@ -147,7 +151,7 @@ speedButton.Font = Enum.Font.GothamSemibold
 speedButton.TextSize = 13
 speedButton.Parent = speedPage
 Instance.new('UICorner',speedButton).CornerRadius = UDim.new(0,7)
-local speedText = label(speedPage,'Velocidade: 16',UDim2.new(1,-24,0,25),UDim2.fromOffset(12,81),Enum.Font.Gotham)
+local speedText = label(speedPage,'Multiplicador: 1.51x',UDim2.new(1,-24,0,25),UDim2.fromOffset(12,81),Enum.Font.Gotham)
 local track = Instance.new('Frame')
 track.Size = UDim2.new(1,-36,0,9)
 track.Position = UDim2.fromOffset(18,118)
@@ -155,96 +159,83 @@ track.BackgroundColor3 = Color3.fromRGB(75,78,95)
 track.Parent = speedPage
 Instance.new('UICorner',track).CornerRadius = UDim.new(1,0)
 local fill = Instance.new('Frame')
-fill.Size = UDim2.fromScale(0,1)
 fill.BackgroundColor3 = Color3.fromRGB(80,190,125)
 fill.Parent = track
 Instance.new('UICorner',fill).CornerRadius = UDim.new(1,0)
 local knob = Instance.new('TextButton')
 knob.Size = UDim2.fromOffset(20,20)
 knob.AnchorPoint = Vector2.new(.5,.5)
-knob.Position = UDim2.fromScale(0,.5)
 knob.Text = ''
 knob.BackgroundColor3 = Color3.fromRGB(235,240,245)
 knob.Parent = track
 Instance.new('UICorner',knob).CornerRadius = UDim.new(1,0)
-local speedNote = label(speedPage,'Arraste a bolinha para ajustar.',UDim2.new(1,-24,0,38),UDim2.fromOffset(12,148),Enum.Font.Gotham,Color3.fromRGB(180,185,195))
+local speedNote = label(speedPage,'Base x multiplicador. Shift preservado.',UDim2.new(1,-24,0,38),UDim2.fromOffset(12,148),Enum.Font.Gotham,Color3.fromRGB(180,185,195))
 speedNote.TextWrapped = true
 speedNote.TextSize = 11
 local function getHumanoid()
     local char = LocalPlayer.Character
     return char and char:FindFirstChildOfClass('Humanoid')
 end
--- Atualizacao orientada a eventos, sem loop de velocidade por frame.
-local speedHumanoid, speedConnection = nil, nil
-local speedChanges = 0
-local speedWindowStart = os.clock()
-local speedLimited = false
-local function detachSpeed()
-    if speedConnection then speedConnection:Disconnect(); speedConnection = nil end
-    speedHumanoid = nil
+local function writeSpeed(base)
+    local hum = speedHumanoid
+    if not speedEnabled or not hum or not hum.Parent or not base then return end
+    if base < 0 or base > 100 then return end
+    local target = base * multiplier
+    if math.abs(hum.WalkSpeed-target) < .03 then return end
+    ownWrite = true
+    hum.WalkSpeed = target
+    lastApplied = target
+    ownWrite = false
 end
-local function restoreSpeed()
-    detachSpeed()
-    for hum, old in pairs(originalSpeeds) do
-        if hum and hum.Parent then
-            pcall(function() hum.WalkSpeed = old end)
-        end
-        originalSpeeds[hum] = nil
-    end
-    speedLimited = false
+local function detachSpeed()
+    if speedConnection then speedConnection:Disconnect(); speedConnection=nil end
+    speedHumanoid = nil
 end
 local function attachSpeed(hum)
     if speedHumanoid == hum then return end
     detachSpeed()
+    lastBase, lastApplied = nil, nil
     speedHumanoid = hum
-    if originalSpeeds[hum] == nil then originalSpeeds[hum] = hum.WalkSpeed end
-    speedChanges, speedWindowStart, speedLimited = 0, os.clock(), false
-    speedConnection = hum:GetPropertyChangedSignal('WalkSpeed'):Connect(function()
-        if not speedEnabled or speedLimited or not hum.Parent then return end
-        if math.abs(hum.WalkSpeed - speedValue) < 0.1 then return end
-        local now = os.clock()
-        if now - speedWindowStart > 2 then
-            speedWindowStart, speedChanges = now, 0
-        end
-        speedChanges = speedChanges + 1
-        -- Nao disputa indefinidamente com o controlador do jogo.
-        if speedChanges > 6 then
-            speedLimited = true
-            speedNote.Text = 'Partida controla a velocidade. Ajuste suspenso para evitar travadas.'
-            return
-        end
-        task.defer(function()
-            if speedEnabled and not speedLimited and speedHumanoid == hum and hum.Parent then
-                hum.WalkSpeed = speedValue
-            end
-        end)
-    end)
-end
-local function applySpeed()
-    local hum = getHumanoid()
     if not hum then return end
-    attachSpeed(hum)
-    if speedLimited then
-        speedLimited = false
-        speedChanges, speedWindowStart = 0, os.clock()
+    lastBase = hum.WalkSpeed
+    speedConnection = hum:GetPropertyChangedSignal('WalkSpeed'):Connect(function()
+        if ownWrite or not speedHumanoid or not speedHumanoid.Parent then return end
+        local current = speedHumanoid.WalkSpeed
+        if lastApplied and math.abs(current-lastApplied) < .03 then return end
+        lastBase = current
+        if speedEnabled then writeSpeed(current) end
+    end)
+    if speedEnabled then writeSpeed(lastBase) end
+end
+local function restoreSpeed()
+    speedEnabled = false
+    if speedHumanoid and speedHumanoid.Parent and lastBase then
+        ownWrite = true
+        speedHumanoid.WalkSpeed = lastBase
+        ownWrite = false
     end
-    hum.WalkSpeed = speedValue
+    lastApplied = nil
 end
 local function updateSpeedUI()
-    speedButton.Text = 'Velocidade [' .. (speedEnabled and 'ON' or 'OFF') .. ']'
-    speedText.Text = 'Velocidade: ' .. speedValue
-    local fraction = (speedValue-speedMin)/(speedMax-speedMin)
+    speedButton.Text = 'Speed Boost [' .. (speedEnabled and 'ON' or 'OFF') .. ']'
+    speedText.Text = string.format('Multiplicador: %.2fx',multiplier)
+    local fraction = (multiplier-speedMin)/(speedMax-speedMin)
     fill.Size = UDim2.fromScale(fraction,1)
     knob.Position = UDim2.fromScale(fraction,.5)
 end
 listen(speedButton.MouseButton1Click,function()
-    speedEnabled = not speedEnabled
     if speedEnabled then
-        applySpeed()
-        speedNote.Text = 'Ajuste solicitado. O jogo pode limitar na partida.'
-    else
         restoreSpeed()
-        speedNote.Text = 'Desligado. Velocidade restaurada.'
+        speedNote.Text = 'Boost desligado.'
+    else
+        -- Captura a velocidade-base atual, como no V32.
+        attachSpeed(getHumanoid())
+        speedEnabled = true
+        if speedHumanoid then
+            lastBase = speedHumanoid.WalkSpeed
+            writeSpeed(lastBase)
+        end
+        speedNote.Text = 'Multiplicador dinamico ativo.'
     end
     updateSpeedUI()
 end)
@@ -253,14 +244,14 @@ local function setSpeedFromX(x)
     local width = track.AbsoluteSize.X
     if width <= 0 then return end
     local fraction = math.clamp((x-track.AbsolutePosition.X)/width,0,1)
-    speedValue = math.floor(speedMin+fraction*(speedMax-speedMin)+.5)
+    multiplier = math.floor((speedMin+fraction*(speedMax-speedMin))*100+.5)/100
     updateSpeedUI()
-    if speedEnabled then applySpeed() end
+    if speedEnabled then writeSpeed(lastBase) end
 end
-listen(knob.MouseButton1Down,function() draggingSpeed = true end)
+listen(knob.MouseButton1Down,function() draggingSpeed=true end)
 listen(track.InputBegan,function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        draggingSpeed = true
+        draggingSpeed=true
         setSpeedFromX(input.Position.X)
     end
 end)
@@ -270,22 +261,17 @@ listen(UIS.InputChanged,function(input)
     end
 end)
 listen(UIS.InputEnded,function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        draggingSpeed = false
-    end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingSpeed=false end
 end)
-listen(LocalPlayer.CharacterAdded,function()
-    if speedEnabled then
-        task.defer(function()
-            local char = LocalPlayer.Character
-            if char then char:WaitForChild('Humanoid',10) end
-            if speedEnabled then applySpeed() end
-        end)
-    end
+listen(LocalPlayer.CharacterAdded,function(char)
+    task.defer(function()
+        local hum = char:WaitForChild('Humanoid',10)
+        if gui.Parent then attachSpeed(hum) end
+    end)
 end)
+attachSpeed(getHumanoid())
 updateSpeedUI()
 
--- V27: observa alteracoes de WalkSpeed e limita tentativas em caso de conflito.
 local enabled = {killer=false,survivor=false,generator=false}
 local colors = {killer=Color3.fromRGB(255,65,65),survivor=Color3.fromRGB(55,235,100),generator=Color3.fromRGB(255,255,255)}
 local marks = {}
@@ -593,7 +579,7 @@ listen(RunService.RenderStepped,function()
         triggered = true
         local ok = pressSpace()
         setAutoNote(ok and 'Espaco acionado! Aguardando proxima rodada...' or 'Falha ao enviar Espaco.')
-        print('[VD HUB V27] Auto gerador', 'Goal:',goal.Rotation,'Line:',line.Rotation,'Erro:',errorNow)
+        print('[VD HUB V33] Auto gerador', 'Goal:',goal.Rotation,'Line:',line.Rotation,'Erro:',errorNow)
     end
 end)
 listen(UIS.InputBegan,function(input,processed)
@@ -627,6 +613,7 @@ listen(gui.Destroying,function()
     autoRequested = false
     speedEnabled = false
     restoreSpeed()
+    detachSpeed()
     if keyHeld and vimOK and VIM then pcall(function() VIM:SendKeyEvent(false,Enum.KeyCode.Space,false,game) end) end
     for _,conn in ipairs(connections) do conn:Disconnect() end
     for inst in pairs(marks) do clearMark(inst) end
@@ -637,4 +624,4 @@ task.spawn(function()
         task.wait(1)
     end
 end)
-print('Violence District HUB V27: velocidade ajustavel, CTRL oculta/mostra; - minimiza; X fecha.')
+print('Violence District HUB V33: multiplicador dinamico, CTRL oculta/mostra; - minimiza; X fecha.')

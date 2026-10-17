@@ -14,10 +14,10 @@ end
 local KILLER_TEAMS = {killer=true, murderer=true, assassin=true, assassino=true}
 local SURVIVOR_TEAMS = {survivor=true, survivors=true, sobrevivente=true, sobreviventes=true}
 
-local previous = CoreGui:FindFirstChild('VDHubV50') or CoreGui:FindFirstChild('VDHubV49') or CoreGui:FindFirstChild('VDHubV36') or CoreGui:FindFirstChild('VDHubV35') or CoreGui:FindFirstChild('VDHubV34') or CoreGui:FindFirstChild('VDHubV33') or CoreGui:FindFirstChild('VDHubV27') or CoreGui:FindFirstChild('VDHubV26') or CoreGui:FindFirstChild('VDHubV25') or CoreGui:FindFirstChild('VDHubV24') or CoreGui:FindFirstChild('VDHubV23') or CoreGui:FindFirstChild('VDHubV22') or CoreGui:FindFirstChild('VDHubV21') or CoreGui:FindFirstChild('VDHubV20') or CoreGui:FindFirstChild('VDHubV19') or CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
+local previous = CoreGui:FindFirstChild('VDHubV53') or CoreGui:FindFirstChild('VDHubV51') or CoreGui:FindFirstChild('VDHubV50') or CoreGui:FindFirstChild('VDHubV49') or CoreGui:FindFirstChild('VDHubV51') or CoreGui:FindFirstChild('VDHubV35') or CoreGui:FindFirstChild('VDHubV34') or CoreGui:FindFirstChild('VDHubV33') or CoreGui:FindFirstChild('VDHubV27') or CoreGui:FindFirstChild('VDHubV26') or CoreGui:FindFirstChild('VDHubV25') or CoreGui:FindFirstChild('VDHubV24') or CoreGui:FindFirstChild('VDHubV23') or CoreGui:FindFirstChild('VDHubV22') or CoreGui:FindFirstChild('VDHubV21') or CoreGui:FindFirstChild('VDHubV20') or CoreGui:FindFirstChild('VDHubV19') or CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
 if previous then previous:Destroy() end
 local gui = Instance.new('ScreenGui')
-gui.Name = 'VDHubV50'
+gui.Name = 'VDHubV53'
 gui.ResetOnSpawn = false
 gui.Parent = CoreGui
 
@@ -51,7 +51,7 @@ local function label(parent, text, size, pos, font, color)
     l.Parent = parent
     return l
 end
-label(frame,'VIOLENCE DISTRICT HUB V50',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
+label(frame,'VIOLENCE DISTRICT HUB V53',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
 -- Controles da janela: minimizar, fechar e esconder com CTRL.
 local function windowButton(symbol, x, bg)
     local b = Instance.new('TextButton')
@@ -101,11 +101,11 @@ espPage.Size = UDim2.fromScale(1,1)
 espPage.BackgroundTransparency = 1
 espPage.BorderSizePixel = 0
 espPage.ScrollBarThickness = 5
-espPage.CanvasSize = UDim2.fromOffset(0,405)
+espPage.CanvasSize = UDim2.fromOffset(0,515)
 espPage.Parent = content
 local speedPage = Instance.new('Frame')
-speedPage.Size = UDim2.new(1,0,0,195)
-speedPage.Position = UDim2.fromOffset(0,200)
+speedPage.Size = UDim2.new(1,0,0,265)
+speedPage.Position = UDim2.fromOffset(0,270)
 speedPage.BackgroundTransparency = 1
 speedPage.Parent = espPage
 local autoPage = Instance.new('Frame')
@@ -281,6 +281,114 @@ listen(LocalPlayer.CharacterAdded,function(char)
 end)
 attachSpeed(getHumanoid())
 updateSpeedUI()
+
+-- Mira visual: apenas desenho, sem alterar camera, mouse ou alvos.
+local crosshairEnabled = false
+local crosshair = Instance.new('Frame')
+crosshair.Name = 'VisualCrosshair'
+crosshair.AnchorPoint = Vector2.new(0.5,0.5)
+crosshair.Position = UDim2.fromScale(0.5,0.5)
+crosshair.Size = UDim2.fromOffset(26,26)
+crosshair.BackgroundTransparency = 1
+crosshair.Visible = false
+crosshair.Parent = gui
+local function crossLine(size, position)
+    local line = Instance.new('Frame')
+    line.Size = size
+    line.Position = position
+    line.AnchorPoint = Vector2.new(0.5,0.5)
+    line.BorderSizePixel = 0
+    line.BackgroundColor3 = Color3.fromRGB(255,255,255)
+    line.Parent = crosshair
+    return line
+end
+crossLine(UDim2.fromOffset(2,18),UDim2.fromScale(0.5,0.5))
+crossLine(UDim2.fromOffset(18,2),UDim2.fromScale(0.5,0.5))
+local crosshairButton = Instance.new('TextButton')
+crosshairButton.Size = UDim2.new(1,-24,0,34)
+crosshairButton.Position = UDim2.fromOffset(10,190)
+crosshairButton.BackgroundColor3 = Color3.fromRGB(54,56,67)
+crosshairButton.TextColor3 = Color3.new(1,1,1)
+crosshairButton.Font = Enum.Font.GothamSemibold
+crosshairButton.TextSize = 13
+crosshairButton.Text = 'Mira Visual [OFF]'
+crosshairButton.Parent = espPage
+Instance.new('UICorner',crosshairButton).CornerRadius = UDim.new(0,7)
+listen(crosshairButton.MouseButton1Click,function()
+    crosshairEnabled = not crosshairEnabled
+    crosshair.Visible = crosshairEnabled
+    crosshairButton.Text = 'Mira Visual [' .. (crosshairEnabled and 'ON' or 'OFF') .. ']'
+end)
+
+-- Aim Lock: apenas enquanto M2 estiver pressionado e a opcao ativa.
+local aimEnabled = false
+local aiming = false
+local aimTarget = nil
+local AIM_MAX_PIXELS = 180
+local AIM_MAX_DISTANCE = 220
+local aimButton = Instance.new('TextButton')
+aimButton.Size = UDim2.new(1,-20,0,34)
+aimButton.Position = UDim2.fromOffset(10,148)
+aimButton.BackgroundColor3 = Color3.fromRGB(54,56,67)
+aimButton.TextColor3 = Color3.new(1,1,1)
+aimButton.Font = Enum.Font.GothamSemibold
+aimButton.TextSize = 13
+aimButton.Text = 'Aim Lock M2 [OFF]'
+aimButton.Parent = espPage
+Instance.new('UICorner',aimButton).CornerRadius = UDim.new(0,7)
+listen(aimButton.MouseButton1Click,function()
+    aimEnabled = not aimEnabled
+    aiming = false
+    aimTarget = nil
+    aimButton.Text = 'Aim Lock M2 [' .. (aimEnabled and 'ON' or 'OFF') .. ']'
+end)
+local function validAimPart(player)
+    if player == LocalPlayer or not player.Character then return nil end
+    local hum = player.Character:FindFirstChildOfClass('Humanoid')
+    if not hum or hum.Health <= 0 then return nil end
+    return player.Character:FindFirstChild('Head') or player.Character:FindFirstChild('HumanoidRootPart')
+end
+local function chooseAimTarget(camera)
+    local center = camera.ViewportSize * .5
+    local best, bestPixels = nil, AIM_MAX_PIXELS
+    for _, player in ipairs(Players:GetPlayers()) do
+        local part = validAimPart(player)
+        if part and (part.Position-camera.CFrame.Position).Magnitude <= AIM_MAX_DISTANCE then
+            local point, visible = camera:WorldToViewportPoint(part.Position)
+            if visible then
+                local pixels = (Vector2.new(point.X,point.Y)-center).Magnitude
+                if pixels < bestPixels then best, bestPixels = player, pixels end
+            end
+        end
+    end
+    return best
+end
+listen(UIS.InputBegan,function(input, processed)
+    if processed or not aimEnabled then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        local camera = workspace.CurrentCamera
+        aimTarget = camera and chooseAimTarget(camera) or nil
+        aiming = aimTarget ~= nil
+    end
+end)
+listen(UIS.InputEnded,function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        aiming = false
+        aimTarget = nil
+    end
+end)
+listen(RunService.RenderStepped,function(dt)
+    if not aimEnabled or not aiming or not aimTarget then return end
+    local camera = workspace.CurrentCamera
+    local part = validAimPart(aimTarget)
+    if not camera or not part then aiming=false; aimTarget=nil; return end
+    if (part.Position-camera.CFrame.Position).Magnitude > AIM_MAX_DISTANCE then
+        aiming=false; aimTarget=nil; return
+    end
+    local desired = CFrame.lookAt(camera.CFrame.Position,part.Position)
+    local alpha = 1-math.exp(-18*math.min(dt,0.1))
+    camera.CFrame = camera.CFrame:Lerp(desired,alpha)
+end)
 
 local enabled = {killer=false,survivor=false,generator=false}
 local colors = {killer=Color3.fromRGB(255,65,65),survivor=Color3.fromRGB(165,85,255),generator=Color3.fromRGB(255,255,255)}
@@ -494,7 +602,7 @@ end
 makeButton('killer','ESP Assassino',10)
 makeButton('survivor','ESP Sobreviventes',55)
 makeButton('generator','ESP Geradores',100)
-label(espPage,'Marcacoes visiveis atraves das paredes',UDim2.new(1,-20,0,34),UDim2.fromOffset(10,148),Enum.Font.Gotham,Color3.fromRGB(170,175,185)).TextSize = 11
+label(espPage,'Marcacoes visiveis atraves das paredes',UDim2.new(1,-20,0,34),UDim2.fromOffset(10,236),Enum.Font.Gotham,Color3.fromRGB(170,175,185)).TextSize = 11
 
 label(autoPage,'AUTO GERADOR',UDim2.new(1,-20,0,32),UDim2.fromOffset(12,10),Enum.Font.GothamBold)
 local autoButton = Instance.new('TextButton')
@@ -638,4 +746,4 @@ task.spawn(function()
         task.wait(1)
     end
 end)
-print('Violence District HUB V50: multiplicador dinamico, CTRL oculta/mostra; - minimiza; X fecha.')
+print('Violence District HUB V53: multiplicador dinamico, CTRL oculta/mostra; - minimiza; X fecha.')

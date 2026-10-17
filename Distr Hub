@@ -13,12 +13,11 @@ end
 
 local KILLER_TEAMS = {killer=true, murderer=true, assassin=true, assassino=true}
 local SURVIVOR_TEAMS = {survivor=true, survivors=true, sobrevivente=true, sobreviventes=true}
-local GENERATOR_NAMES = {generator=true, generators=true, gerador=true, geradores=true}
 
-local previous = CoreGui:FindFirstChild('VDHubV36') or CoreGui:FindFirstChild('VDHubV35') or CoreGui:FindFirstChild('VDHubV34') or CoreGui:FindFirstChild('VDHubV33') or CoreGui:FindFirstChild('VDHubV27') or CoreGui:FindFirstChild('VDHubV26') or CoreGui:FindFirstChild('VDHubV25') or CoreGui:FindFirstChild('VDHubV24') or CoreGui:FindFirstChild('VDHubV23') or CoreGui:FindFirstChild('VDHubV22') or CoreGui:FindFirstChild('VDHubV21') or CoreGui:FindFirstChild('VDHubV20') or CoreGui:FindFirstChild('VDHubV19') or CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
+local previous = CoreGui:FindFirstChild('VDHubV50') or CoreGui:FindFirstChild('VDHubV49') or CoreGui:FindFirstChild('VDHubV36') or CoreGui:FindFirstChild('VDHubV35') or CoreGui:FindFirstChild('VDHubV34') or CoreGui:FindFirstChild('VDHubV33') or CoreGui:FindFirstChild('VDHubV27') or CoreGui:FindFirstChild('VDHubV26') or CoreGui:FindFirstChild('VDHubV25') or CoreGui:FindFirstChild('VDHubV24') or CoreGui:FindFirstChild('VDHubV23') or CoreGui:FindFirstChild('VDHubV22') or CoreGui:FindFirstChild('VDHubV21') or CoreGui:FindFirstChild('VDHubV20') or CoreGui:FindFirstChild('VDHubV19') or CoreGui:FindFirstChild('VDHubV8') or CoreGui:FindFirstChild('VDHubV7') or CoreGui:FindFirstChild('VDHubV6') or CoreGui:FindFirstChild('VDHubV5') or CoreGui:FindFirstChild('VDHubV4') or CoreGui:FindFirstChild('VDHubV3') or CoreGui:FindFirstChild('VDHubV2')
 if previous then previous:Destroy() end
 local gui = Instance.new('ScreenGui')
-gui.Name = 'VDHubV36'
+gui.Name = 'VDHubV50'
 gui.ResetOnSpawn = false
 gui.Parent = CoreGui
 
@@ -52,7 +51,7 @@ local function label(parent, text, size, pos, font, color)
     l.Parent = parent
     return l
 end
-label(frame,'VIOLENCE DISTRICT HUB V36',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
+label(frame,'VIOLENCE DISTRICT HUB V50',UDim2.new(1,-105,0,34),UDim2.fromOffset(12,5),Enum.Font.GothamBold)
 -- Controles da janela: minimizar, fechar e esconder com CTRL.
 local function windowButton(symbol, x, bg)
     local b = Instance.new('TextButton')
@@ -595,7 +594,7 @@ listen(RunService.RenderStepped,function()
         triggered = true
         local ok = pressSpace()
         setAutoNote(ok and 'Espaco acionado! Aguardando proxima rodada...' or 'Falha ao enviar Espaco.')
-        print('[VD HUB V35] Auto gerador', 'Goal:',goal.Rotation,'Line:',line.Rotation,'Erro:',errorNow)
+        print('[VD HUB V50] Auto gerador', 'Goal:',goal.Rotation,'Line:',line.Rotation,'Erro:',errorNow)
     end
 end)
 listen(UIS.InputBegan,function(input,processed)
@@ -627,7 +626,6 @@ end
 listen(gui.Destroying,function()
     running = false
     autoRequested = false
-    speedEnabled = false
     restoreSpeed()
     detachSpeed()
     if keyHeld and vimOK and VIM then pcall(function() VIM:SendKeyEvent(false,Enum.KeyCode.Space,false,game) end) end
@@ -640,4 +638,4 @@ task.spawn(function()
         task.wait(1)
     end
 end)
-print('Violence District HUB V36: multiplicador dinamico, CTRL oculta/mostra; - minimiza; X fecha.')
+print('Violence District HUB V50: multiplicador dinamico, CTRL oculta/mostra; - minimiza; X fecha.')
